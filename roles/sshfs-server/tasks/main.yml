@@ -1,0 +1,117 @@
+---
+
+- name: create sshfs keys directory
+  file: path=/etc/sshfs state=directory
+
+- name: create sshfs private key
+  shell: ssh-keygen -t rsa -N "" -C {{ inventory_hostname }} -f /etc/sshfs/id_rsa
+  args:
+    creates: /etc/sshfs/id_rsa
+
+- name: create sshfs host keys
+  shell: ssh-keygen -t {{ item }} -N "" -C {{ inventory_hostname }} -f /etc/sshfs/ssh_host_{{ item }}_key
+  args:
+    creates: /etc/sshfs/ssh_host_{{ item }}_key
+  with_items:
+    - dsa
+    - rsa
+    - ecdsa
+    - ed25519
+
+- name: fetch sshfs public key after creation
+  fetch: >
+    src=/etc/sshfs/id_rsa.pub
+    dest=fetch/id_rsa_{{ inventory_hostname }}.pub
+    flat=yes
+    fail_on_missing=yes
+
+- name: fetch sshfs public host key after creation
+  fetch: >
+    src=/etc/sshfs/ssh_host_ed25519_key.pub
+    dest=fetch/ssh_host_ed25519_{{ inventory_hostname }}_key.pub
+    flat=yes
+    fail_on_missing=yes
+
+# - name: create ssh_known_hosts file
+#   template: >
+#     src=known_hosts.j2
+#     dest=/opt/ssh-server/known_hosts
+#     mode=0755
+
+# - name: tell the host about our servers it might want to ssh
+#   known_hosts:
+#     path: /opt/ssh-server/known_hosts
+#     name: {{ item }}
+#     key: "{{ lookup('file', 'fetch/id_rsa_{{ item }}.pub') }}"
+#   with_items: "{{ play_hosts }}"
+#   when: item != inventory_hostname
+
+- name: touch sshfs authorized_hosts file
+  file: path=/etc/sshfs/authorized_keys state=touch mode=0644
+
+- name: tell the host about the keys of servers that might want to ssh
+  authorized_key:
+    path: /etc/sshfs/authorized_keys
+    user: root
+    key: "{{ lookup('file', 'fetch/id_rsa_{{ item }}.pub') }}"
+    manage_dir: no
+  with_items: "{{ play_hosts }}"
+  when: item != inventory_hostname
+
+- name: touch root's .ssh directory
+  file: path=/root/.ssh state=directory mode=0700
+
+- name: touch root's authorized_hosts file
+  file: path=/root/.ssh/known_hosts state=touch mode=0664
+
+# -H for hashed version
+- name: tell the host about the servers it might want to ssh
+  shell: "ssh -o StrictHostKeyChecking=no {{ item }} -p2222 /bin/true || test $? -eq 255"
+  with_items: "{{ play_hosts }}"
+  when: item != inventory_hostname
+
+#- name: tell the host about the servers it might want to ssh
+#  shell: "ssh-keygen -R \\[{{ item }}\\]:2222 && ssh-keyscan -p 2222 {{ item }} >> ~/.ssh/known_hosts"
+#  with_items: "{{ play_hosts }}"
+#  when: item != inventory_hostname
+
+# doesn't work:
+
+#- name: tell the host about the servers it might want to ssh
+#  known_hosts:
+#    path: "/root/.ssh/known_hosts"
+#    host: "{{ item }}:2222"
+#    key: "{{ lookup('file', 'fetch/ssh_host_ed25519_{{ item }}_key.pub') }}"
+#  with_items: "{{ play_hosts }}"
+#  when: item != inventory_hostname
+
+- name: add sshfs-server folder
+  file: path=/opt/docker/sshfs-server state=directory
+
+- name: upload sshfs-server docker-compose package
+  synchronize: >
+    src=/roles/sshfs-server/files/docker/sshfs-server/
+    dest=/opt/docker/sshfs-server/
+    archive=no
+    recursive=yes
+
+- name: create docker-compose.yml file
+  template: >
+    src=docker-compose.yml.j2
+    dest=/opt/docker/sshfs-server/docker-compose.yml
+    mode=0755
+
+- name: stop and remove any old containers
+  shell: docker-compose -p sshfs down
+  args:
+    chdir: "/opt/docker/sshfs-server"
+
+- name: stop and remove any old containers
+  shell: docker-compose down
+  args:
+    chdir: "/opt/docker/sshfs-server"
+
+- name: create and run the container
+  shell: docker-compose -p sshfs up -d
+  args:
+    chdir: "/opt/docker/sshfs-server"

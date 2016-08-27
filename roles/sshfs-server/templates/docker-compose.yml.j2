@@ -1,0 +1,9 @@
+version: '2'
+services:
+  sshfs-server:
+    container_name: sshfs-server
+    extends: 
+      file: ./docker-compose.template.yml
+      service: sshfs-server
+    ports:
+      - "{{ vpn_ip }}:2222:22"

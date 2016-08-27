@@ -1,0 +1,50 @@
+---
+
+- name: install sshfs
+  package: >
+    name=sshfs
+    state=latest
+
+- name: add local folder
+  file: path=/opt/production/local state=directory recurse=yes
+
+- name: add mount-target folders
+  file: path=/opt/production/{{ item }} state=directory
+  with_items: "{{ play_hosts }}"
+  when: item != inventory_hostname
+  ignore_errors: yes
+
+- name: add symlink for local folder
+  file: src=/opt/production/local dest=/opt/production/{{ inventory_hostname }} state=link
+
+- name: add nodes to /etc/hosts (ansible_inventory resolves to vpn_ip)
+  lineinfile:
+    dest: "/etc/hosts"
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item].vpn_ip }} {{item}}"
+    state: "present"
+  when: hostvars[item].vpn_ip is defined
+  with_items: "{{ play_hosts }}"
+
+# consider http://superuser.com/a/512685/316130
+# Ciphers=arcfour, <- doesn't work
+
+- name: ensure nodes in /etc/fstab and unmount
+  mount:
+    name: "/opt/production/{{ item }}"
+    src: "root@{{ item }}:/data"
+    fstype: "fuse.sshfs"
+    opts: "noauto,x-systemd.automount,allow_other,_netdev,users,IdentityFile=/etc/sshfs/id_rsa,reconnect,port=2222,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,Ciphers=chacha20-poly1305@openssh.com"
+    state: "unmounted"
+  with_items: "{{ play_hosts }}"
+  when: item != inventory_hostname
+
+- name: ensure nodes in /etc/fstab and mount
+  mount:
+    name: "/opt/production/{{ item }}"
+    src: "root@{{ item }}:/data"
+    fstype: "fuse.sshfs"
+    opts: "noauto,x-systemd.automount,allow_other,_netdev,users,IdentityFile=/etc/sshfs/id_rsa,reconnect,port=2222,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,Ciphers=chacha20-poly1305@openssh.com"
+    state: "mounted"
+  with_items: "{{ play_hosts }}"
+  when: item != inventory_hostname

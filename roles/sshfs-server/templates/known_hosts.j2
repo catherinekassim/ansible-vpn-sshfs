@@ -1,0 +1,5 @@
+{% for host in play_hosts %}
+{% if inventory_hostname != hostvars[host]['inventory_hostname'] %}
+{{ hostvars[host]['inventory_hostname'] }} {% include "fetch/id_rsa_" + host + ".pub" %}
+{% endif %}
+{% endfor %}

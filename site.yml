@@ -1,0 +1,16 @@
+---
+
+- hosts: vpn
+  roles:
+     - tinc
+
+- hosts: sshfs
+  roles:
+    - docker-compose
+    - sshfs-server
+    - sshfs
+
+- hosts: removevpn
+  roles:
+    - tinc-remove
+    # - sshfs-remove
