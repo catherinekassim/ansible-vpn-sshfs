@@ -1,16 +1,19 @@
 ---
 
 - hosts: vpn
+  remote_user: root
   roles:
      - tinc
 
 - hosts: sshfs
+  remote_user: root
   roles:
     - docker-compose
     - sshfs-server
     - sshfs
 
 - hosts: removevpn
+  remote_user: root
   roles:
     - tinc-remove
     # - sshfs-remove
