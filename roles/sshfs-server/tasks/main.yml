@@ -90,10 +90,11 @@
 
 - name: upload sshfs-server docker-compose package
   synchronize: >
-    src=/roles/sshfs-server/files/docker/sshfs-server/
+    src=roles/sshfs-server/files/docker/sshfs-server/
     dest=/opt/docker/sshfs-server/
     archive=no
     recursive=yes
+    rsync_path=/bin/rsync
 
 - name: create docker-compose.yml file
   template: >
