@@ -1,0 +1,11 @@
+version: '2'
+services:
+  sshfs-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - "/etc/sshfs:/etc/ssh/keys"
+      - "/etc/sshfs/authorized_keys:/root/.ssh/authorized_keys"
+      - "/opt/production/local:/data"
+    restart: always
